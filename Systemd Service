@@ -1,0 +1,15 @@
+[Unit]
+Description=Nginx Management Web Portal
+After=network.target nginx.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/nginx-portal
+ExecStart=/usr/bin/python3 /opt/nginx-portal/app.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
