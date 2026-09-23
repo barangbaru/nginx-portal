@@ -60,7 +60,7 @@ Buka `app.py` dan sesuaikan variabel konfigurasi berikut:
 
 1. **`CF_API_TOKEN`**: Isi dengan Cloudflare API Token Anda yang memiliki izin `Zone:Read` dan `DNS:Edit` pada semua domain.
 2. **`CERTBOT_ACCOUNT_ID`**: Sesuaikan hash akun Let's Encrypt Anda (bisa dicek lewat `ls /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/`). Default saat ini: `5a0a`.
-3. **`PORTAL_PASSWORD`**: Password login default: `K0song!n`.
+3. **`PORTAL_PASSWORD`**: Password login default: `password`.
 
 ---
 
