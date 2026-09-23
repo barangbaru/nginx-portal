@@ -10,7 +10,7 @@ app = Flask(__name__)
 app.secret_key = "super_secret_nginx_portal_key_change_me"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=5)
 
-PORTAL_PASSWORD = "K0song!n"
+PORTAL_PASSWORD = "password"
 AVAILABLE_DIR = "/etc/nginx/sites-available"
 ENABLED_DIR = "/etc/nginx/sites-enabled"
 # ================= cek id certbot =================
