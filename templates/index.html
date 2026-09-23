@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nginx Manager Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+  <div class="max-w-7xl mx-auto p-6">
+    
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-gray-800 mb-6 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">Nginx Control Portal</h1>
+        <p class="text-sm text-gray-400">Kelola virtual host, Cloudflare DNS, certbot SSL, dan status service</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="controlService('test')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-500 rounded text-sm font-semibold transition">Test Config</button>
+        <button onclick="controlService('reload')" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-semibold transition">Reload</button>
+        <button onclick="controlService('restart')" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 rounded text-sm font-semibold transition">Restart</button>
+        <a href="/logout" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-sm font-semibold text-gray-300 transition">Logout</a>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Kolom Kiri: Virtual Hosts List -->
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 h-fit">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-lg font-semibold">Virtual Hosts</h2>
+          <button onclick="newSite()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs font-bold transition">+ Baru</button>
+        </div>
+
+        <div class="space-y-2 mb-4">
+          <input 
+            type="text" 
+            id="search-input" 
+            oninput="renderSiteList()" 
+            placeholder="Cari domain / file..." 
+            class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-mono"
+          >
+
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <select id="filter-status" onchange="renderSiteList()" class="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 focus:outline-none focus:border-emerald-500">
+              <option value="all">Semua Status</option>
+              <option value="enabled">Hanya Aktif</option>
+              <option value="disabled">Hanya Nonaktif</option>
+            </select>
+
+            <select id="sort-order" onchange="renderSiteList()" class="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-300 focus:outline-none focus:border-emerald-500">
+              <option value="name-asc">Alfabet (A-Z)</option>
+              <option value="name-desc">Alfabet (Z-A)</option>
+              <option value="status-active">Status (Aktif Duluan)</option>
+              <option value="status-inactive">Status (Nonaktif Duluan)</option>
+            </select>
+          </div>
+        </div>
+
+        <ul id="site-list" class="divide-y divide-gray-700 space-y-1 max-h-[600px] overflow-y-auto pr-1">
+          <!-- Diisi via JS -->
+        </ul>
+      </div>
+
+      <!-- Kolom Kanan: Editor, Cloudflare DNS, SSL Certbot, & Terminal Logs -->
+      <div class="md:col-span-2 space-y-6">
+        
+        <!-- 1. Editor Panel -->
+        <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 flex flex-col">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <input type="text" id="site-name" placeholder="Nama file (contoh: example.com.conf)" class="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm w-full sm:w-1/2 focus:outline-none focus:border-emerald-500 font-mono">
+            <button onclick="saveSite()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded text-sm font-bold transition w-full sm:w-auto">Simpan Konfigurasi</button>
+          </div>
+          <textarea id="editor" rows="16" placeholder="# Masukkan konfigurasi Nginx di sini..." class="w-full bg-gray-950 font-mono text-sm p-4 rounded border border-gray-700 text-gray-200 focus:outline-none focus:border-emerald-500 leading-relaxed"></textarea>
+        </div>
+
+        <!-- 2. Cloudflare DNS Manager -->
+        <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-orange-400 text-lg">☁️</span>
+              <h2 class="text-lg font-semibold">Cloudflare DNS Manager</h2>
+            </div>
+            <button onclick="loadCloudflareZones()" title="Muat ulang domain dari Cloudflare" class="text-xs text-gray-400 hover:text-white px-2 py-1 bg-gray-700 rounded">🔄 Refresh Domain</button>
+          </div>
+          <p class="text-xs text-gray-400 mb-4">Pilih domain utama dari akun Cloudflare Anda dan tentukan subdomain yang ingin dibuatkan A-Record.</p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Domain Utama (Zone)</label>
+              <select id="cf-zone-select" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 font-mono text-gray-200">
+                <option value="">Memuat domain...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Subdomain / Host Prefix</label>
+              <input type="text" id="cf-subdomain" placeholder="api (atau biarkan kosong untuk root @)" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">IP Target (Server IP)</label>
+              <input type="text" id="cf-ip" placeholder="103.xxx.xxx.xxx" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500 font-mono">
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 mt-3">
+            <input type="checkbox" id="cf-proxied" class="rounded bg-gray-900 border-gray-700 text-orange-500 focus:ring-0 cursor-pointer">
+            <label for="cf-proxied" class="text-xs text-gray-300 cursor-pointer">
+              Aktifkan Cloudflare Proxy (Orange Cloud) <span class="text-gray-500 italic">(Nonaktifkan jika ingin request Certbot)</span>
+            </label>
+          </div>
+
+          <div class="mt-4">
+            <button id="btn-cf-dns" onclick="createDnsRecord()" class="w-full py-2 bg-orange-600 hover:bg-orange-500 rounded text-sm font-bold transition flex justify-center items-center gap-2 text-white">
+              <span>+ Buat DNS A-Record di Cloudflare</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Let's Encrypt SSL Generator -->
+        <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-emerald-400 text-lg">🔒</span>
+            <h2 class="text-lg font-semibold">Let's Encrypt SSL Generator</h2>
+          </div>
+          <p class="text-xs text-gray-400 mb-4">Pastikan DNS A-Record domain sudah aktif dan mengarah ke IP server ini sebelum melakukan request.</p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Domain Name</label>
+              <input type="text" id="cert-domain" placeholder="example.com atau sub.example.com" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Email Notifikasi (Opsional)</label>
+              <input type="email" id="cert-email" placeholder="admin@example.com" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono">
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <button id="btn-certbot" onclick="requestSSL()" class="w-full py-2 bg-teal-600 hover:bg-teal-500 rounded text-sm font-bold transition flex justify-center items-center gap-2">
+              <span>Generate / Renew SSL (Certbot)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Terminal Logs -->
+        <div class="bg-black border border-gray-800 rounded-lg p-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs text-gray-500 font-mono">Execution / Terminal Logs:</span>
+            <button onclick="document.getElementById('console-log').innerText = 'Log cleared.'" class="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+          </div>
+          <pre id="console-log" class="text-xs font-mono text-emerald-400 whitespace-pre-wrap max-h-60 overflow-y-auto">Siap.</pre>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const logElem = document.getElementById('console-log');
+    let allSites = [];
+    let cfZones = [];
+
+    async function loadSites() {
+      const res = await fetch('/api/sites');
+      if (res.status === 401) return window.location.href = '/login';
+      allSites = await res.json();
+      renderSiteList();
+    }
+
+    function renderSiteList() {
+      const listElem = document.getElementById('site-list');
+      const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+      const statusFilter = document.getElementById('filter-status').value;
+      const sortOrder = document.getElementById('sort-order').value;
+
+      let filtered = allSites.filter(site => {
+        const matchesSearch = site.name.toLowerCase().includes(searchQuery);
+        const matchesStatus = 
+          statusFilter === 'all' ? true :
+          statusFilter === 'enabled' ? site.enabled :
+          !site.enabled;
+        return matchesSearch && matchesStatus;
+      });
+
+      filtered.sort((a, b) => {
+        if (sortOrder === 'name-asc') return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        if (sortOrder === 'name-desc') return b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
+        if (sortOrder === 'status-active') {
+          if (a.enabled === b.enabled) return a.name.localeCompare(b.name);
+          return a.enabled ? -1 : 1;
+        }
+        if (sortOrder === 'status-inactive') {
+          if (a.enabled === b.enabled) return a.name.localeCompare(b.name);
+          return a.enabled ? 1 : -1;
+        }
+        return 0;
+      });
+
+      listElem.innerHTML = '';
+      if (filtered.length === 0) {
+        listElem.innerHTML = `<li class="text-center py-4 text-xs text-gray-500 italic">Tidak ada virtual host yang cocok.</li>`;
+        return;
+      }
+
+      filtered.forEach(site => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-between items-center py-2 px-2 hover:bg-gray-700/50 rounded cursor-pointer transition';
+        li.innerHTML = `
+          <span onclick="loadConfig('${site.name}')" class="text-sm font-mono flex-1 truncate pr-2" title="${site.name}">${site.name}</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-0.5 rounded font-medium ${site.enabled ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-gray-700 text-gray-400'}">
+              ${site.enabled ? 'Aktif' : 'Nonaktif'}
+            </span>
+            <button onclick="toggleSite('${site.name}')" title="${site.enabled ? 'Nonaktifkan' : 'Aktifkan'}" class="text-xs text-gray-400 hover:text-white px-1">⚙️</button>
+          </div>
+        `;
+        listElem.appendChild(li);
+      });
+    }
+
+    async function loadConfig(name) {
+      const res = await fetch(`/api/sites/${name}`);
+      if (res.status === 401) return window.location.href = '/login';
+      const data = await res.json();
+      document.getElementById('site-name').value = data.name;
+      document.getElementById('editor').value = data.content;
+      logElem.innerText = `Memuat file: ${name}`;
+    }
+
+    function newSite() {
+      document.getElementById('site-name').value = '';
+      document.getElementById('editor').value = `server {\n    listen 80;\n    server_name example.com;\n\n    location / {\n        proxy_pass http://127.0.0.1:3000;\n    }\n}`;
+      logElem.innerText = "Template konfigurasi baru dibuat.";
+    }
+
+    async function saveSite() {
+      const name = document.getElementById('site-name').value.trim();
+      const content = document.getElementById('editor').value;
+      if (!name) return alert('Nama file harus diisi!');
+
+      const res = await fetch('/api/sites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, content })
+      });
+      if (res.status === 401) return window.location.href = '/login';
+      const data = await res.json();
+      logElem.innerText = data.message || data.error;
+      loadSites();
+    }
+
+    async function toggleSite(name) {
+      const res = await fetch(`/api/sites/${name}/toggle`, { method: 'POST' });
+      if (res.status === 401) return window.location.href = '/login';
+      const data = await res.json();
+      logElem.innerText = data.message || data.error;
+      loadSites();
+    }
+
+    async function controlService(action) {
+      logElem.innerText = `Menjalankan: ${action}...`;
+      const res = await fetch(`/api/service/${action}`, { method: 'POST' });
+      if (res.status === 401) return window.location.href = '/login';
+      const data = await res.json();
+      logElem.innerText = `[STATUS: ${data.success ? 'BERHASIL' : 'GAGAL'}]\n${data.output}`;
+    }
+
+    async function loadCloudflareZones() {
+      const selectElem = document.getElementById('cf-zone-select');
+      selectElem.innerHTML = `<option value="">Memuat domain dari Cloudflare...</option>`;
+
+      try {
+        const res = await fetch('/api/cloudflare/zones');
+        if (res.status === 401) return window.location.href = '/login';
+        const data = await res.json();
+
+        if (Array.isArray(data)) {
+          cfZones = data;
+          selectElem.innerHTML = data.length === 0 
+            ? `<option value="">Tidak ada domain ditemukan di akun ini</option>`
+            : data.map(z => `<option value="${z.id}" data-name="${z.name}">${z.name}</option>`).join('');
+          logElem.innerText = `Berhasil memuat ${data.length} domain dari Cloudflare.`;
+        } else {
+          selectElem.innerHTML = `<option value="">Gagal memuat domain</option>`;
+          logElem.innerText = `Cloudflare Error: ${data.error}`;
+        }
+      } catch (err) {
+        selectElem.innerHTML = `<option value="">Error API</option>`;
+        logElem.innerText = `Gagal menghubungi Cloudflare: ${err.message}`;
+      }
+    }
+
+    async function createDnsRecord() {
+      const selectElem = document.getElementById('cf-zone-select');
+      const zone_id = selectElem.value;
+      const selectedOption = selectElem.options[selectElem.selectedIndex];
+      const rootDomain = selectedOption ? selectedOption.getAttribute('data-name') : '';
+
+      const prefix = document.getElementById('cf-subdomain').value.trim();
+      const ip_address = document.getElementById('cf-ip').value.trim();
+      const proxied = document.getElementById('cf-proxied').checked;
+      const btn = document.getElementById('btn-cf-dns');
+
+      if (!zone_id || !ip_address) {
+        alert('Pilih Domain Utama dan isi IP Address!');
+        return;
+      }
+
+      let fullDomain = rootDomain;
+      if (prefix && prefix !== '@') {
+        fullDomain = `${prefix}.${rootDomain}`;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Memproses ke Cloudflare...";
+      logElem.innerText = `Membuat DNS Record: ${fullDomain} -> ${ip_address}...`;
+
+      try {
+        const res = await fetch('/api/cloudflare/dns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zone_id, name: fullDomain, ip_address, proxied })
+        });
+
+        if (res.status === 401) return window.location.href = '/login';
+        const data = await res.json();
+
+        if (data.success) {
+          logElem.innerText = `[CLOUDFLARE SUCCESS]\n${data.message}`;
+          document.getElementById('cert-domain').value = fullDomain;
+        } else {
+          logElem.innerText = `[CLOUDFLARE FAILED]\n${data.error}`;
+        }
+      } catch (err) {
+        logElem.innerText = `Error: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "+ Buat DNS A-Record di Cloudflare";
+      }
+    }
+
+    async function requestSSL() {
+      const domain = document.getElementById('cert-domain').value.trim();
+      const email = document.getElementById('cert-email').value.trim();
+      const btn = document.getElementById('btn-certbot');
+
+      if (!domain) {
+        alert('Masukkan nama domain terlebih dahulu!');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Memproses Certbot... (bisa butuh 10-20 detik)";
+      logElem.innerText = `Meminta sertifikat SSL untuk domain: ${domain}...\nMohon tunggu proses challenge Let's Encrypt...`;
+
+      try {
+        const res = await fetch('/api/certbot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain, email })
+        });
+
+        if (res.status === 401) {
+          alert('Sesi login telah habis. Silakan login kembali.');
+          window.location.href = '/login';
+          return;
+        }
+
+        const data = await res.json();
+        logElem.innerText = `[CERTBOT ${data.success ? 'SUCCESS' : 'FAILED'}]\n${data.output || data.error}`;
+        
+        const currentOpen = document.getElementById('site-name').value;
+        if (currentOpen) loadConfig(currentOpen);
+      } catch (err) {
+        logElem.innerText = `Error: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Generate / Renew SSL (Certbot)";
+      }
+    }
+
+    loadSites();
+    loadCloudflareZones();
+  </script>
+</body>
+</html>
